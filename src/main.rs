@@ -1,29 +1,41 @@
+mod ui;
+
 use druid::kurbo::BezPath;
 use druid::widget::{Flex, Label};
-use druid::{AppLauncher, Color, Data, Env, EventCtx, Lens, LocalizedString, PaintCtx, Widget, WidgetExt, WindowDesc, LensExt, Size, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Selector};
+use druid::{AppLauncher, Color, Data, Env, EventCtx, Lens, LocalizedString, PaintCtx, Widget, WidgetExt, WindowDesc, LensExt, Size, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Selector, RenderContext, Target};
 use sysinfo::{System, Cpu};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
+use im::Vector;
 
-#[derive(Clone, Data, Lens)]
+#[derive(Clone, Lens)]
 struct State {
-    cpu_history: Vec<Vec<f64>>,
+    cpu_history: Vector<Vector<f64>>,
     used_mem: f64,
     total_mem: f64,
+}
+
+impl Data for State {
+    fn same(&self, _other: &Self) -> bool {
+        // Always trigger a paint; avoids Data bound issues for f64
+        false
+    }
 }
 
 const HISTORY_SIZE: usize = 120; // number of samples per core
 const UPDATE_METRICS: Selector<State> = Selector::new("update_metrics");
 
 fn main() {
-
     // Set initial state
     let mut sys = System::new_all();
     sys.refresh_cpu_all();
 
     let cores = sys.cpus().len();
-    let initial_history = vec![vec![0.0; HISTORY_SIZE]; cores];
+    let mut initial_history = Vector::new();
+    for _ in 0..cores {
+        initial_history.push_back(Vector::from(vec![0.0, HISTORY_SIZE as f64]));
+    }
 
     let state = State {
         cpu_history: initial_history,
@@ -31,7 +43,7 @@ fn main() {
         total_mem: 0.0,
     };
 
-    let main_window = WindowDesc::new(build_ui(cores))
+    let main_window = WindowDesc::new(ui::build_ui(cores))
         .title(LocalizedString::new("Rust Druid CPU Monitor"))
         .window_size((800.0, 400.0));
 
@@ -54,63 +66,25 @@ fn main() {
             let used_mem = sys.used_memory() as f64 / 1024.0 / 1024.0;
             let total_mem = sys.total_memory() as f64 / 1024.0 / 1024.0;
 
+            // convert Vec<Vec<f64>> -> im::Vector<im::Vector<f64>>
+            let mut history_vector = Vector::new();
+            for v in &history {
+                history_vector.push_back(Vector::from(v.clone()));
+            }
+
             let updated_state = State {
-                cpu_history: history.clone(),
+                cpu_history: history_vector.clone(),
                 used_mem,
                 total_mem,
             };
 
-            sink.submit_command(UPDATE_METRICS, updated_state, None)
+            sink.submit_command(UPDATE_METRICS, updated_state, Target::Auto)
                 .unwrap();
 
-            thread::sleep(Duration::from_millis(1000));
+            thread::sleep(Duration::from_millis(500));
         }
     });
 
     launcher.launch(state).expect("Failed to launch app");
 }
 
-fn build_ui(cores: usize) -> impl Widget<State> {
-    Flex::column()
-        .with_child(Label::new(|data: &State, _env: &Env| {
-            format!(
-                "Memory: {:1}/{:1}" MB,
-                data.used_mem / data.total_mem,
-            )
-        }))
-        .with_spacer(10.0)
-        .with_child(CpuGraph::new(cores).lens(State::cpu_history))
-}
-
-// Custom widget for per-core CPU graph
-struct CpuGraph {
-    cores: usize,
-}
-
-impl CpuGraph {
-    fn new(cores: usize) -> Self {
-        Self { cores }
-    }
-}
-
-impl Widget<Vec<Vec<f64>>> for CpuGraph {
-    fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut Vec<Vec<f64>>, env: &Env) {
-        todo!()
-    }
-
-    fn lifecycle(&mut self, ctx: &mut LifeCycleCtx, event: &LifeCycle, data: &Vec<Vec<f64>>, env: &Env) {
-        todo!()
-    }
-
-    fn update(&mut self, ctx: &mut UpdateCtx, old_data: &Vec<Vec<f64>>, data: &Vec<Vec<f64>>, env: &Env) {
-        todo!()
-    }
-
-    fn layout(&mut self, ctx: &mut LayoutCtx, bc: &BoxConstraints, data: &Vec<Vec<f64>>, env: &Env) -> Size {
-        bc.max()
-    }
-
-    fn paint(&mut self, ctx: &mut PaintCtx, data: &Vec<Vec<f64>>, env: &Env) {
-        todo!()
-    }
-}
