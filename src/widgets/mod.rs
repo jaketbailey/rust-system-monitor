@@ -1,1 +1,1 @@
-pub (crate) mod cpu_graph;
+pub (crate) mod usage_graph;
