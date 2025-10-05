@@ -1,20 +1,31 @@
 mod ui;
 mod widgets;
+mod gpu;
 
+use std::io::{Error, ErrorKind};
 use druid::{AppLauncher, Data, Lens, LocalizedString, WindowDesc, LensExt, Selector, RenderContext, Target};
 use sysinfo::{System, Cpu};
 use std::thread;
 use std::time::Duration;
 use im::Vector;
+use nvml_wrapper::Nvml;
+use crate::gpu::GPU;
 
 #[derive(Clone, Lens, Debug)]
 struct State {
+    cpu: CPU,
+    gpu: GPU,
+}
+
+#[derive(Clone, Lens, Debug)]
+struct CPU {
     cpu_history: Vector<Vector<f64>>,
     cpu_avg_history: Vector<f64>,
     used_mem_history: Vector<f64>,
     used_mem: f64,
     total_mem: f64,
 }
+
 
 impl Data for State {
     fn same(&self, _other: &Self) -> bool {
@@ -24,10 +35,10 @@ impl Data for State {
 }
 
 const HISTORY_SIZE: usize = 120; // number of samples per core
-const UPDATE_METRICS: Selector<State> = Selector::new("update_metrics");
+const UPDATE_METRICS: Selector<CPU> = Selector::new("update_metrics");
+const UPDATE_GPU: Selector<GPU> = Selector::new("update_gpu");
 
-fn main() {
-    // Set initial state
+fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut sys = System::new_all();
     sys.refresh_cpu_all();
 
@@ -37,20 +48,25 @@ fn main() {
         initial_history.push_back(Vector::from(vec![0.0; HISTORY_SIZE]));
     }
 
-    let state = State {
-        cpu_history: initial_history,
-        cpu_avg_history: Vector::from(vec![0.0; HISTORY_SIZE]),
-        used_mem_history: Vector::from(vec![0.0; HISTORY_SIZE]),
-        used_mem: 0.0,
-        total_mem: 0.0,
-    };
-
     let main_window = WindowDesc::new(ui::build_ui())
         .title(LocalizedString::new("Rust Druid System Monitor"))
-        .window_size((800.0, 400.0));
+        .window_size((800.0, 600.0));
 
     let launcher = AppLauncher::with_window(main_window);
     let sink = launcher.get_external_handle();
+
+    // Set initial state
+    let state = State {
+        cpu: CPU {
+            cpu_history: initial_history,
+            cpu_avg_history: Vector::from(vec![0.0; HISTORY_SIZE]),
+            used_mem_history: Vector::from(vec![0.0; HISTORY_SIZE]),
+            used_mem: 0.0,
+            total_mem: 0.0,
+        },
+        gpu: GPU::new(sink.clone())
+
+    };
 
     thread::spawn(move || {
         let mut sys = System::new_all();
@@ -87,7 +103,7 @@ fn main() {
                 history_vector.push_back(Vector::from(v.clone()));
             }
 
-            let updated_state = State {
+            let updated_cpu = CPU {
                 cpu_history: history_vector.clone(),
                 cpu_avg_history: Vector::from(avg_history.clone()),
                 used_mem_history: Vector::from(mem_history.clone()),
@@ -95,13 +111,16 @@ fn main() {
                 total_mem,
             };
 
-            sink.submit_command(UPDATE_METRICS, updated_state, Target::Auto)
+            sink.submit_command(UPDATE_METRICS, updated_cpu, Target::Auto)
                 .unwrap();
 
-            thread::sleep(Duration::from_millis(500));
+            thread::sleep(Duration::from_millis(200));
         }
     });
 
+
+
     launcher.launch(state).expect("Failed to launch app");
+    Err(Box::new(Error::new(ErrorKind::Other, "Failed to launch app")))
 }
 

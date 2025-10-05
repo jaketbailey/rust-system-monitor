@@ -2,7 +2,7 @@ use druid::{BoxConstraints, Color, Env, Event, EventCtx, FontFamily, LayoutCtx, 
 use druid::kurbo::{BezPath, Line};
 use druid::piet::{Text, TextLayout, TextLayoutBuilder};
 use im::Vector;
-use crate::{State, HISTORY_SIZE, UPDATE_METRICS};
+use crate::{State, HISTORY_SIZE, UPDATE_GPU, UPDATE_METRICS};
 
 const FONT_SIZE: f64 = 10.0;
 const LABEL_COLOUR: Color = Color::grey8(220);
@@ -26,7 +26,8 @@ const COLOURS: [Color; 12] = [
 pub enum PlotType {
     AverageCPU,
     PerCoreCPU,
-    RAM
+    RAM,
+    GPU,
 }
 
 // Custom widget for per-core CPU graph
@@ -117,13 +118,16 @@ impl UsageGraph {
 impl Widget<State> for UsageGraph {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut State, env: &Env) {
         if let Event::Command(cmd) = event {
-            if let Some(new_state) = cmd.get(UPDATE_METRICS) {
+            if let Some(new_cpu) = cmd.get(UPDATE_METRICS) {
                 // Replace whole state (or selectively update fields)
-                data.cpu_history = new_state.cpu_history.clone();
-                data.cpu_avg_history = new_state.cpu_avg_history.clone();
-                data.used_mem_history = new_state.used_mem_history.clone();
-                data.used_mem = new_state.used_mem;
-                data.total_mem = new_state.total_mem;
+                data.cpu.cpu_history = new_cpu.cpu_history.clone();
+                data.cpu.cpu_avg_history = new_cpu.cpu_avg_history.clone();
+                data.cpu.used_mem_history = new_cpu.used_mem_history.clone();
+                data.cpu.used_mem = new_cpu.used_mem;
+                data.cpu.total_mem = new_cpu.total_mem;
+                ctx.request_paint();
+            } else if let Some(new_gpu) = cmd.get(UPDATE_GPU) {
+                data.gpu = new_gpu.clone();
                 ctx.request_paint();
             }
         }
@@ -188,22 +192,35 @@ impl Widget<State> for UsageGraph {
 
         match self.plot_type {
             PlotType::AverageCPU => {
-                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[1], data.cpu_avg_history.clone());
+                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[1], data.cpu.cpu_avg_history.clone());
             }
             PlotType::PerCoreCPU => {
                 let mut items: Vec<(String, Color)> = Vec::new();
-                for i in 0..data.cpu_history.len() {
+                for i in 0..data.cpu.cpu_history.len() {
                     let colour = COLOURS[i % COLOURS.len()].clone();
                     items.push((format!("Core {}", i + 1), colour));
                 }
                 UsageGraph::draw_legends(ctx, plot_rect, legend_x, legend_y, item_height, text_offset, &items);
-                for (i, core_history) in data.cpu_history.iter().enumerate() {
+                for (i, core_history) in data.cpu.cpu_history.iter().enumerate() {
                     let colour = &COLOURS[i % COLOURS.len()];
                     UsageGraph::draw_line(ctx, plot_rect.clone(), &colour, core_history.clone());
                 }
             }
             PlotType::RAM => {
-                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[2], data.used_mem_history.clone());
+                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[2], data.cpu.used_mem_history.clone());
+            }
+            PlotType::GPU => {
+                // Convert VRAM bytes history to percentage of total (0..100)
+                let total = if data.gpu.total_mem > 0.0 { data.gpu.total_mem } else { 1.0 };
+                let mut v: Vec<f64> = Vec::with_capacity(data.gpu.used_mem_history.len());
+                for val in data.gpu.used_mem_history.iter() {
+                    let pct = (val / total) * 100.0;
+                    // clamp to [0, 100]
+                    let pct = if pct.is_finite() { pct.max(0.0).min(100.0) } else { 0.0 };
+                    v.push(pct);
+                }
+                let history = im::Vector::from(v);
+                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[3], history)
             }
         };
 
