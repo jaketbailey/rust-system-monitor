@@ -86,6 +86,19 @@ impl GPU {
                     used_mem_history.rotate_left(1);
                     used_mem_history[HISTORY_SIZE - 1] = mem_info.used as f64;
 
+                    // Convert VRAM bytes history to percentage of total (0..100)
+                    let total = if mem_info.total > 0 { mem_info.total } else { 1 };
+                    let mut v: Vec<f64> = Vec::with_capacity(used_mem_history.len());
+                    
+                    for val in used_mem_history.iter() {
+                        let pct = (val / total as f64) * 100.0;
+                        // clamp to [0, 100]
+                        let pct = if pct.is_finite() { pct.max(0.0).min(100.0) } else { 0.0 };
+                        v.push(pct);
+                    }
+
+                    let used_mem_history_percentage = Vector::from(v);
+
                     let brand = device
                         .brand()
                         .map(|b| format!("{:?}", b))
@@ -99,7 +112,7 @@ impl GPU {
                         name,
                         temp_history: Vector::from(temp_history.clone()),
                         fan_speed_history: Vector::from(fan_speed_history.clone()),
-                        used_mem_history: Vector::from(used_mem_history.clone()),
+                        used_mem_history: Vector::from(used_mem_history_percentage.clone()),
                         used_mem: mem_info.used as f64,
                         total_mem: mem_info.total as f64,
                     };

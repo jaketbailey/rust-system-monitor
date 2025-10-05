@@ -210,17 +210,7 @@ impl Widget<State> for UsageGraph {
                 UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[2], data.cpu.used_mem_history.clone());
             }
             PlotType::GPU => {
-                // Convert VRAM bytes history to percentage of total (0..100)
-                let total = if data.gpu.total_mem > 0.0 { data.gpu.total_mem } else { 1.0 };
-                let mut v: Vec<f64> = Vec::with_capacity(data.gpu.used_mem_history.len());
-                for val in data.gpu.used_mem_history.iter() {
-                    let pct = (val / total) * 100.0;
-                    // clamp to [0, 100]
-                    let pct = if pct.is_finite() { pct.max(0.0).min(100.0) } else { 0.0 };
-                    v.push(pct);
-                }
-                let history = im::Vector::from(v);
-                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[3], history)
+                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[3], data.gpu.used_mem_history.clone())
             }
         };
 
