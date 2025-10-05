@@ -1,10 +1,8 @@
 mod ui;
+mod widgets;
 
-use druid::kurbo::BezPath;
-use druid::widget::{Flex, Label};
-use druid::{AppLauncher, Color, Data, Env, EventCtx, Lens, LocalizedString, PaintCtx, Widget, WidgetExt, WindowDesc, LensExt, Size, Event, LifeCycleCtx, LifeCycle, UpdateCtx, LayoutCtx, BoxConstraints, Selector, RenderContext, Target};
+use druid::{AppLauncher, Data, Lens, LocalizedString, WindowDesc, LensExt, Selector, RenderContext, Target};
 use sysinfo::{System, Cpu};
-use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::Duration;
 use im::Vector;
