@@ -42,7 +42,7 @@ fn main() {
     };
 
     let main_window = WindowDesc::new(ui::build_ui(cores))
-        .title(LocalizedString::new("Rust Druid CPU Monitor"))
+        .title(LocalizedString::new("Rust Druid System Monitor"))
         .window_size((800.0, 400.0));
 
     let launcher = AppLauncher::with_window(main_window);
