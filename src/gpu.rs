@@ -1,4 +1,3 @@
-use std::io::{Error, ErrorKind};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
@@ -89,7 +88,7 @@ impl GPU {
                     // Convert VRAM bytes history to percentage of total (0..100)
                     let total = if mem_info.total > 0 { mem_info.total } else { 1 };
                     let mut v: Vec<f64> = Vec::with_capacity(used_mem_history.len());
-                    
+
                     for val in used_mem_history.iter() {
                         let pct = (val / total as f64) * 100.0;
                         // clamp to [0, 100]

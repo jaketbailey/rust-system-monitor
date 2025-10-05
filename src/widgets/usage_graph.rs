@@ -118,13 +118,13 @@ impl UsageGraph {
 impl Widget<State> for UsageGraph {
     fn event(&mut self, ctx: &mut EventCtx, event: &Event, data: &mut State, env: &Env) {
         if let Event::Command(cmd) = event {
-            if let Some(new_cpu) = cmd.get(UPDATE_METRICS) {
+            if let Some(new_stats) = cmd.get(UPDATE_METRICS) {
                 // Replace whole state (or selectively update fields)
-                data.cpu.cpu_history = new_cpu.cpu_history.clone();
-                data.cpu.cpu_avg_history = new_cpu.cpu_avg_history.clone();
-                data.cpu.used_mem_history = new_cpu.used_mem_history.clone();
-                data.cpu.used_mem = new_cpu.used_mem;
-                data.cpu.total_mem = new_cpu.total_mem;
+                data.system.cpu_history = new_stats.cpu_history.clone();
+                data.system.cpu_avg_history = new_stats.cpu_avg_history.clone();
+                data.system.used_mem_history = new_stats.used_mem_history.clone();
+                data.system.used_mem = new_stats.used_mem;
+                data.system.total_mem = new_stats.total_mem;
                 ctx.request_paint();
             } else if let Some(new_gpu) = cmd.get(UPDATE_GPU) {
                 data.gpu = new_gpu.clone();
@@ -192,22 +192,22 @@ impl Widget<State> for UsageGraph {
 
         match self.plot_type {
             PlotType::AverageCPU => {
-                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[1], data.cpu.cpu_avg_history.clone());
+                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[1], data.system.cpu_avg_history.clone());
             }
             PlotType::PerCoreCPU => {
                 let mut items: Vec<(String, Color)> = Vec::new();
-                for i in 0..data.cpu.cpu_history.len() {
+                for i in 0..data.system.cpu_history.len() {
                     let colour = COLOURS[i % COLOURS.len()].clone();
                     items.push((format!("Core {}", i + 1), colour));
                 }
                 UsageGraph::draw_legends(ctx, plot_rect, legend_x, legend_y, item_height, text_offset, &items);
-                for (i, core_history) in data.cpu.cpu_history.iter().enumerate() {
+                for (i, core_history) in data.system.cpu_history.iter().enumerate() {
                     let colour = &COLOURS[i % COLOURS.len()];
                     UsageGraph::draw_line(ctx, plot_rect.clone(), &colour, core_history.clone());
                 }
             }
             PlotType::RAM => {
-                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[2], data.cpu.used_mem_history.clone());
+                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[2], data.system.used_mem_history.clone());
             }
             PlotType::GPU => {
                 UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[3], data.gpu.used_mem_history.clone())
