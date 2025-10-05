@@ -31,7 +31,7 @@ pub enum PlotType {
 }
 
 // Custom widget for per-core CPU graph
-pub (crate) struct UsageGraph {
+pub(crate) struct UsageGraph {
     plot_type: PlotType,
 }
 

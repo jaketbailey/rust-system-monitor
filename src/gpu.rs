@@ -6,7 +6,7 @@ use im::Vector;
 use nvml_wrapper::enum_wrappers::device::TemperatureSensor;
 use nvml_wrapper::error::NvmlError;
 use nvml_wrapper::Nvml;
-use crate::{gpu, HISTORY_SIZE, UPDATE_GPU, UPDATE_METRICS};
+use crate::{HISTORY_SIZE, UPDATE_GPU};
 
 #[derive(Clone, Debug)]
 pub (crate) struct GPU {

@@ -1,5 +1,4 @@
 mod ui;
-mod widgets;
 mod gpu;
 mod system;
 
