@@ -19,6 +19,8 @@ pub (crate) struct GPU {
     pub(crate)total_mem: f64,
 }
 
+pub (crate) const MAX_RPM:u32 = 3000;
+
 impl GPU {
     pub (crate) fn new(sink: ExtEventSink) -> Self {
         let nvml = Nvml::init().unwrap();
@@ -34,9 +36,8 @@ impl GPU {
     }
 
     pub (crate) fn handle_nvidia(sink: ExtEventSink, nvml: Arc<Nvml>) -> Result<GPU, NvmlError> {
-        // Initialize histories with zeros; actual GPU data will be populated by the spawned thread.
+        // Initialise histories with zeros; actual GPU data will be populated by the spawned thread.
         let mut temp_history = vec![0.0; HISTORY_SIZE];
-        let mut fan_speed_history: Vector<Vector<f64>> = Vector::new();
         let mut used_mem_history = vec![0.0; HISTORY_SIZE];
 
         // Keep the Nvml alive inside the thread by moving the Arc into the closure.
@@ -61,13 +62,16 @@ impl GPU {
             // Local working buffer for fan history accumulation
             let mut fan_history = vec![vec![0.0; HISTORY_SIZE]; num_fans as usize];
 
-            loop { // Update temperature history
+            loop {
+                let mut fan_speed_history: Vector<Vector<f64>> = Vector::new();
+
+                // Update temperature history
                 if let Ok(temp) = device.temperature(TemperatureSensor::Gpu) {
                     temp_history.rotate_left(1);
                     temp_history[HISTORY_SIZE - 1] = temp as f64;
                 }
 
-                // Update fan histories
+                // Update fan speed histories
                 for i in 0..num_fans as usize {
                     if let Ok(fan_speed) = device.fan_speed(i as u32) {
                         fan_history[i].rotate_left(1);
@@ -75,8 +79,8 @@ impl GPU {
                     }
                 }
 
-                // convert Vec<Vec<f64>> -> im::Vector<im::Vector<f64>>
-                for v in &fan_history {
+                // Convert Vec<Vec<f64>> -> im::Vector<im::Vector<f64>>
+                for v in fan_history.clone() {
                     fan_speed_history.push_back(Vector::from(v.clone()));
                 }
 
@@ -91,7 +95,6 @@ impl GPU {
 
                     for val in used_mem_history.iter() {
                         let pct = (val / total as f64) * 100.0;
-                        // clamp to [0, 100]
                         let pct = if pct.is_finite() { pct.max(0.0).min(100.0) } else { 0.0 };
                         v.push(pct);
                     }
@@ -110,7 +113,7 @@ impl GPU {
                         brand,
                         name,
                         temp_history: Vector::from(temp_history.clone()),
-                        fan_speed_history: Vector::from(fan_speed_history.clone()),
+                        fan_speed_history: fan_speed_history.clone(),
                         used_mem_history: Vector::from(used_mem_history_percentage.clone()),
                         used_mem: mem_info.used as f64,
                         total_mem: mem_info.total as f64,

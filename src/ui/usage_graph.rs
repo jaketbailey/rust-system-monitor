@@ -3,6 +3,7 @@ use druid::kurbo::{BezPath, Line};
 use druid::piet::{Text, TextLayout, TextLayoutBuilder};
 use im::Vector;
 use crate::{State, HISTORY_SIZE, UPDATE_GPU, UPDATE_METRICS};
+use crate::gpu::MAX_RPM;
 
 const FONT_SIZE: f64 = 10.0;
 const LABEL_COLOUR: Color = Color::grey8(220);
@@ -28,6 +29,8 @@ pub enum PlotType {
     PerCoreCPU,
     RAM,
     GPU,
+    GPUFan,
+    GPUTemp
 }
 
 // Custom widget for per-core CPU graph
@@ -163,10 +166,20 @@ impl Widget<State> for UsageGraph {
             (plot_rect.x0, plot_rect.y1),
         ), &axis_color, 2.0); // Y axis
 
-        // Draw y-axis tick labels
         for i in 0..=10 {
             let y = plot_rect.y1 - (i as f64) * (plot_rect.height() / 10.0);
-            let label = format!("{}%", i * 10);
+            let label = match self.plot_type {
+                PlotType::GPUFan => {
+                    let step = MAX_RPM / 10; // 300
+                    format!("{}RPM", i * step)
+                }
+                PlotType::GPUTemp => {
+                    format!("{}°C", i * 10)
+                }
+                _ => {
+                    format!("{}%", i * 10)
+                }
+            };
             ctx.stroke(Line::new(
                 (plot_rect.x0 - 5.0, y),
                 (plot_rect.x0, y),
@@ -211,6 +224,32 @@ impl Widget<State> for UsageGraph {
             }
             PlotType::GPU => {
                 UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[3], data.gpu.used_mem_history.clone())
+            }
+            PlotType::GPUFan => {
+                // For each GPU fan, convert RPM history to percentage of 3000 RPM for plotting
+                let mut items: Vec<(String, Color)> = Vec::new();
+                for i in 0..data.gpu.fan_speed_history.len() {
+                    let colour = COLOURS[i % COLOURS.len()].clone();
+                    items.push((format!("Fan {}", i + 1), colour));
+                }
+                if !items.is_empty() {
+                    UsageGraph::draw_legends(ctx, plot_rect, legend_x, legend_y, item_height, text_offset, &items);
+                }
+                for (i, fan_history) in data.gpu.fan_speed_history.iter().enumerate() {
+                    let colour = &COLOURS[i % COLOURS.len()];
+                    let mut v: Vec<f64> = Vec::with_capacity(fan_history.len());
+                    for val in fan_history.iter() {
+                        let pct = if MAX_RPM as f64 > 0.0 { (val / MAX_RPM as f64) * 100.0 } else { 0.0 };
+                        let pct = if pct.is_finite() { pct.max(0.0).min(100.0) } else { 0.0 };
+                        v.push(pct);
+                    }
+                    let pct_history = Vector::from(v);
+                    UsageGraph::draw_line(ctx, plot_rect.clone(), &colour, pct_history);
+                }
+            }
+            PlotType::GPUTemp => {
+                // temp_history already stores temperatures in °C; draw_line expects values on 0..100 scale
+                UsageGraph::draw_line(ctx, plot_rect.clone(), &COLOURS[4], data.gpu.temp_history.clone());
             }
         };
 

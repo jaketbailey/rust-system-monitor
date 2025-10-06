@@ -27,7 +27,7 @@ pub (crate) fn main_panel() -> Flex<State> {
             )
         }))
         .with_flex_child(UsageGraph::new(PlotType::RAM).expand_width(), 1.0)
-
+        // GPU VRAM Usage plot
         .with_child(Label::new(|data: &State, _env: &Env| {
             format!(
                 "GPU: {} \nVRAM Usage: {:.2} GB / {:.2}GB ",
@@ -37,4 +37,15 @@ pub (crate) fn main_panel() -> Flex<State> {
             )
         }))
         .with_flex_child(UsageGraph::new(PlotType::GPU).expand_width(), 1.0)
+        // GPU Fan Speed plot
+        .with_flex_child(UsageGraph::new(PlotType::GPUFan).expand_width(), 1.0)
+        // GPU Temperature plot
+        .with_child(Label::new(|data: &State, _env: &Env| {
+            let temp = data.gpu.temp_history[data.gpu.temp_history.len() - 1];
+            format!(
+                "GPU Temperature (°C): {:.2}",
+                temp,
+            )
+        }))
+        .with_flex_child(UsageGraph::new(PlotType::GPUTemp).expand_width(), 1.0)
 }

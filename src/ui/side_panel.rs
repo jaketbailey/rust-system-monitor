@@ -1,5 +1,5 @@
 use druid::widget::{Flex, Label};
-use druid::WidgetExt;
+use druid::{Env, WidgetExt};
 use crate::State;
 
 pub (crate) fn side_panel() -> Flex<State> {
@@ -7,5 +7,7 @@ pub (crate) fn side_panel() -> Flex<State> {
     Flex::column()
         .with_spacer(10.0)
         .with_child(Label::new("System Info").expand_width())
-        .with_child(Label::new(""))
+        .with_child(Label::new(|_data: &State, _env: &Env| {
+            "CPU Usage (average)".to_string()
+        }))
 }

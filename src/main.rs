@@ -28,7 +28,7 @@ const UPDATE_GPU: Selector<GPU> = Selector::new("update_gpu");
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let main_window = WindowDesc::new(ui::build_ui())
         .title(LocalizedString::new("Rust Druid System Monitor"))
-        .window_size((800.0, 600.0));
+        .window_size((900.0, 750.0));
 
     let launcher = AppLauncher::with_window(main_window);
     let sink = launcher.get_external_handle();
