@@ -83,7 +83,6 @@ impl UsageGraph {
         let text_baseline_offset = 6.0; // aligns with prior rendering
 
         for (label, colour) in items.iter() {
-            // measure text
             let layout = ctx
                 .text()
                 .new_text_layout(label.clone())
